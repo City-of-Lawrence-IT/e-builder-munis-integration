@@ -1,0 +1,25 @@
+Meeting scheduled 9/30 to re-review priority of which 1-2 key items to be ready for API by 1/1/23.
+
+(1) Parking Kiosk complete/tested
+(2) Commitment approvals - need to figure out the work flows, may not need?
+- What is the equivalent in munis?
+(3) Commitment invoices - 1st priority
+- push from e-builder to munis?
+(4) Invoice payment status - same as invoices
+- from Munis to ebuilder
+(5) General invoices 
+- from munis to ebuilder
+(6) Vendors - nice to have, manual process right now
+- prevent double entry if possible?
+(7) Budget changes [if time permits]
+- nice to have, but annoying to check two systems.
+
+
+
+Req number in innoprise matches commitment # in ebuilder
+
+Munis - will not be using reqs and PO'saving
+using contract numbers? commitment # in ebuilder = contract # in munis
+- Start invoices nightly from ebuilder to munis *future idea, talk to admin about process
+
+placeholder number until the end, then PO number takes it's place until the end

@@ -3,7 +3,7 @@ from urllib.error import HTTPError
 from dotenv import load_dotenv
 from os import environ
 import sys, pyodbc, logging, requests, json
-from datetime import timedelta, date
+from datetime import datetime, timedelta, date
 from logging.handlers import SMTPHandler
 
 import pandas as pd
@@ -61,7 +61,7 @@ def refresh_token():
 def get_munis_PL_token():
     url = "https://cityoflawrenceksforms-test.tylerhost.net/4907test/devportal/portal/api/clientCredential"
 
-    payload='grant_type=client_credentials&scope=munisOpenApiPLToolkit%20tylerOpenApiServiceAccess'
+    payload='grant_type=client_credentials&scope=munisOpenApiPOToolkit%20munisOpenApiPLToolkit%20tylerOpenApiServiceAccess'
     headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0',
     'Accept': 'application/json, text/plain, */*',
@@ -87,7 +87,80 @@ def get_munis_PL_token():
 
 #functions to get Munis Data to send to e-builder
 munis_token = get_munis_PL_token()
+#Do I need to get the PO data or the project list string? Probably PO data?
+#data probably need to connect back to a specific project
+#set PO == contractNumber field in get request
 def get_commitment_invoice_by_id(token):
-    pass
+    print(environ.get("MUNIS_ENDPOINT")+"munisopenapi/hosts/PO/api/PO/v1/purchaseOrders")
+    endpoint = environ.get("MUNIS_ENDPOINT")+"munisopenapi/hosts/PO/api/PO/v1/purchaseOrders"
+    payload={}
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer '+token
+    }
+    yesterday = (date.today()- timedelta(days=1))
 
+    response = requests.request("GET", endpoint, headers=headers, data=payload)
+    print(response.text)
+    
+    column_names = {
+        "Invoice Number":[], 
+        "Description":[],
+        "Company Number":[],
+        "Action":[],
+        "Date Approved":[],
+        "Date Paid":[],
+        "Account Code":[],
+        "Item Number":[]
+    }
+    df = pd.DataFrame(data=column_names)
+    for record in response:
+        last_mod_date = date(record.lastModifiedDate)
+        if (last_mod_date.day == yesterday.day):
+            approval_date = ""
+            account_code = ""
+            if (record.isApproved):
+                #get project string
+
+                allocations = record.allocations
+                projectCode = allocations[0].projectCode
+                url = environ.get("MUNIS_ENDPOINT")+"/munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '"+projectCode+"'"
+                payload={}
+                headers = {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer '+token
+                }
+
+                projectString = requests.request("GET", url, headers=headers, data=payload)
+                #get approval date
+                approval_date = projectString.approvalDate
+                
+            
+            
+            tempdf = {
+            "Invoice Number":[record.purchaseOrderNumber], 
+            "Description":[record.commodityCode],#second call to get details?
+            "Company Number":[record.vendorNumber],
+            "Action":[record.status],
+            "Date Approved":[approval_date],#get project string, get approval date if approved
+            "Date Paid":[record.x], # if closed, get the receipt recieved date
+            "Account Code":[allocations.fullAccount],
+            "Item Number":[record.items.lineNumber]
+        }
+            df.append()
+    return df
+
+
+
+commitment_invoices = get_commitment_invoice_by_id(munis_token)
+commitment_invoices.to_csv('CommitmentInvoicesUpdate.csv', index=False)
+"""
+Order of operations:
+- get list of purchase orders
+- filter by changes made in last 24 hours
+- get change order status 
+value ID, old value, new value, changed
+
+    "lastModifiedDate": "2022-10-25T20:14:59.056Z",
+"""
 #functions to get e-builder data to send to Munis
