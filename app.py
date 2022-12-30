@@ -4,7 +4,7 @@ from os import environ
 import sys, pyodbc, logging, requests, json
 from datetime import datetime, timedelta, date
 from logging.handlers import SMTPHandler
-
+from dateutil import parser
 import pandas as pd
 
 
@@ -154,7 +154,7 @@ def get_commitment_invoice_by_id(token):
             last_mod = record.get("lastModifiedDate")
             created = record.get("entryDate")
             print(created)
-            entry_date = date(int(created))
+            entry_date = parser.parse(created)
             if (last_mod != None):
                 last_mod_date = date(last_mod)
                 if (last_mod_date.day == yesterday.day):
