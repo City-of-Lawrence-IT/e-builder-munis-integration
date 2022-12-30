@@ -1,4 +1,3 @@
-from cmath import log
 from urllib.error import HTTPError
 from dotenv import load_dotenv
 from os import environ
@@ -10,6 +9,40 @@ import pandas as pd
 
 
 load_dotenv()
+#email log errors
+bot_email = environ.get("EMAIL")
+bot_password = environ.get("PASSWORD")
+# Apply format to the log messages
+formatter = '[{asctime}] [{name}] [{levelname}] - {message}' 
+logging.basicConfig(filename="logs/app.log", format=formatter, style="{")
+logger = logging.getLogger()
+#SMTP Mail handler settup
+mail_handler = SMTPHandler(
+    mailhost=("smtp.office365.com", 587),
+    fromaddr= bot_email, 
+    toaddrs="dansmith@lawrenceks.org",
+    subject="eBuilder export error",
+    credentials=(bot_email, bot_password),
+    secure= () 
+
+)
+mail_handler.setFormatter(logging.Formatter(
+    """
+    Message type:       %(levelname)s
+    Location:           %(pathname)s:%(lineno)d
+    Module:             %(module)s
+    Function:           %(funcName)s
+    Time:               %(asctime)s
+
+    Message:
+
+    %(message)s
+    """
+
+))
+mail_handler.setLevel(logging.ERROR)
+logger.addHandler(mail_handler)
+
 #global variables for requrests
 user_email_address = environ.get("EMAIL")
 email_password = environ.get("EMAILPASSWORD")
@@ -18,7 +51,7 @@ password = environ.get("PASSWORD")
 token = ""
 munis_cred = environ.get("MUNIS_CREDENTIALS")
 #setting up logger
-logger = logging.getLogger('ebuilder-munis-logger')
+""" logger = logging.getLogger('ebuilder-munis-logger')
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
@@ -35,7 +68,7 @@ def error_handler(error_type, error_value, trace_back):
     logger.exception('Uncaught exception: {}'.format(str(error_value)))
 
 
-sys.excepthook = error_handler
+sys.excepthook = error_handler """
 
 #e-builder token refresh function
 def refresh_token():
@@ -63,23 +96,22 @@ def get_munis_PL_token():
 
     payload='grant_type=client_credentials&scope=munisOpenApiPOToolkit%20munisOpenApiPLToolkit%20tylerOpenApiServiceAccess'
     headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0',
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.5',
     'Accept-Encoding': 'gzip, deflate, br',
-    'Referer': 'https://cityoflawrenceksforms-test.tylerhost.net/4907test/devportal/portal/help?encodedUri=https:%2F%2Fcityoflawrenceksmunisapp-test.tylerhost.net%2F4907test%2Fmunisopenapi%2Fhosts%2FPL%2Fswagger%2Fall-versions%2Fswagger.json',
+    'Referer': 'https://cityoflawrenceksforms-train.tylerhost.net/4907train/devportal/portal/open-api/collection',
     'Content-Type': 'application/x-www-form-urlencoded',
     'X-Requested-With': 'XMLHttpRequest',
-    'X-TID-E-Url': 'https://tyler-cityoflawrenceks.okta.com/oauth2/ausfis4bi0hkah3ES357/v1/token',
-    'X-Client': munis_cred,
-    'Origin': 'https://cityoflawrenceksforms-test.tylerhost.net',
+    'X-OpenApiDeveloperPortal-TokenEnpoint': 'https://tyler-cityoflawrenceks.okta.com/oauth2/ausfis4bi0hkah3ES357/v1/token',
+    'X-OpenApiDeveloperPortal-Client': munis_cred,
+    'Origin': 'https://cityoflawrenceksforms-train.tylerhost.net',
     'DNT': '1',
     'Connection': 'keep-alive',
-    'Cookie': 'ai_user=8O128|2022-07-15T13:51:30.842Z; ai_session=oqs4x|1657898155655|1657898167678',
     'Sec-Fetch-Dest': 'empty',
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Site': 'same-origin',
-    'Sec-GPC': '1'
+    'Sec-GPC': '1',
     }
     response = requests.request("POST", url, headers=headers, data=payload)
     response_body = json.loads(response.text)
@@ -91,64 +123,77 @@ munis_token = get_munis_PL_token()
 #data probably need to connect back to a specific project
 #set PO == contractNumber field in get request
 def get_commitment_invoice_by_id(token):
-    print(environ.get("MUNIS_ENDPOINT")+"munisopenapi/hosts/PO/api/PO/v1/purchaseOrders")
-    endpoint = environ.get("MUNIS_ENDPOINT")+"munisopenapi/hosts/PO/api/PO/v1/purchaseOrders"
-    payload={}
-    headers = {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer '+token
-    }
-    yesterday = (date.today()- timedelta(days=1))
-
-    response = requests.request("GET", endpoint, headers=headers, data=payload)
-    print(response.text)
-    
-    column_names = {
-        "Invoice Number":[], 
-        "Description":[],
-        "Company Number":[],
-        "Action":[],
-        "Date Approved":[],
-        "Date Paid":[],
-        "Account Code":[],
-        "Item Number":[]
-    }
-    df = pd.DataFrame(data=column_names)
-    for record in response:
-        last_mod_date = date(record.lastModifiedDate)
-        if (last_mod_date.day == yesterday.day):
-            approval_date = ""
-            account_code = ""
-            if (record.isApproved):
-                #get project string
-
-                allocations = record.allocations
-                projectCode = allocations[0].projectCode
-                url = environ.get("MUNIS_ENDPOINT")+"/munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '"+projectCode+"'"
-                payload={}
-                headers = {
-                'Accept': 'application/json',
-                'Authorization': 'Bearer '+token
-                }
-
-                projectString = requests.request("GET", url, headers=headers, data=payload)
-                #get approval date
-                approval_date = projectString.approvalDate
-                
-            
-            
-            tempdf = {
-            "Invoice Number":[record.purchaseOrderNumber], 
-            "Description":[record.commodityCode],#second call to get details?
-            "Company Number":[record.vendorNumber],
-            "Action":[record.status],
-            "Date Approved":[approval_date],#get project string, get approval date if approved
-            "Date Paid":[record.x], # if closed, get the receipt recieved date
-            "Account Code":[allocations.fullAccount],
-            "Item Number":[record.items.lineNumber]
+    try:
+        print(environ.get("MUNIS_ENDPOINT")+"munisopenapi/hosts/PO/api/PO/v1/purchaseOrders")
+        endpoint = environ.get("MUNIS_ENDPOINT")+"munisopenapi/hosts/PO/api/PO/v1/purchaseOrders"
+        payload={}
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer '+token
         }
-            df.append()
-    return df
+        yesterday = (date.today()- timedelta(days=1))
+
+        response = requests.request("GET", endpoint, headers=headers, data=payload)
+        #print(response.text)
+        response = response.text
+
+        column_names = {
+            "Invoice Number":[], 
+            "Description":[],
+            "Company Number":[],
+            "Action":[],
+            "Date Approved":[],
+            "Date Paid":[],
+            "Account Code":[],
+            "Item Number":[]
+        }
+        df = pd.DataFrame(data=column_names)
+        data = json.loads(response)
+        for record in data:
+            print(record.get("lastModifiedDate"))
+            last_mod = record.get("lastModifiedDate")
+            created = record.get("entryDate")
+            print(created)
+            entry_date = date(int(created))
+            if (last_mod != None):
+                last_mod_date = date(last_mod)
+                if (last_mod_date.day == yesterday.day):
+                    approval_date = ""
+                    account_code = ""
+                    if (record.isApproved):
+                        #get project string
+
+                        allocations = record.allocations
+                        projectCode = allocations[0].projectCode
+                        url = environ.get("MUNIS_ENDPOINT")+"/munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '"+projectCode+"'"
+                        payload={}
+                        headers = {
+                        'Accept': 'application/json',
+                        'Authorization': 'Bearer '+token
+                        }
+
+                        projectString = requests.request("GET", url, headers=headers, data=payload)
+                        #get approval date
+                        approval_date = projectString.approvalDate
+                        
+                    
+                    
+                    tempdf = {
+                    "Invoice Number":[record.purchaseOrderNumber], 
+                    "Description":[record.commodityCode],#second call to get details?
+                    "Company Number":[record.vendorNumber],
+                    "Action":[record.status],
+                    "Date Approved":[approval_date],#get project string, get approval date if approved
+                    "Date Paid":[record.x], # if closed, get the receipt recieved date
+                    "Account Code":[allocations.fullAccount],
+                    "Item Number":[record.items.lineNumber]
+                }
+                    df.append()
+            elif(entry_date.day == yesterday.day):
+                print(record)
+        return df
+    except Exception as e:
+        raise e
 
 
 
