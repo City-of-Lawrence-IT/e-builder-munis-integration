@@ -92,7 +92,7 @@ def refresh_token():
         logger.exception(e)
 #Get Munis project ledger token
 def get_munis_PL_token():
-    url = "https://cityoflawrenceksforms-test.tylerhost.net/4907test/devportal/portal/api/clientCredential"
+    url = "https://cityoflawrenceksforms.tylerhost.net/4907prod/devportal/portal/api/clientCredential"
 
     payload='grant_type=client_credentials&scope=munisOpenApiPOToolkit%20munisOpenApiPLToolkit%20tylerOpenApiServiceAccess'
     headers = {
@@ -156,7 +156,7 @@ def get_commitment_invoice_by_id(token):
             print(created)
             entry_date = parser.parse(created)
             if (last_mod != None):
-                last_mod_date = date(last_mod)
+                last_mod_date = parser.parse(last_mod)
                 if (last_mod_date.day == yesterday.day):
                     approval_date = ""
                     account_code = ""
