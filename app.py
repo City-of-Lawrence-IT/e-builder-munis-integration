@@ -8,48 +8,50 @@ from dateutil import parser
 import pandas as pd
 
 load_dotenv()
+# global variables for requrests
+USER_EMAIL_ADDRESS = environ.get("EMAIL")
+email_password = environ.get("EMAILPASSWORD")
+EB_API_USERNAME = environ.get("EB_API_USERNAME")
+EB_API_PASSWORD = environ.get("EB_API_PASSWORD")
+munis_cred = environ.get("MUNIS_CREDENTIALS")
 # email log errors
 bot_email = environ.get("EMAIL")
 bot_password = environ.get("PASSWORD")
 munis_endpoint = environ.get("MUNIS_ENDPOINT")
+
 # Apply format to the log messages
 formatter = "[{asctime}] [{name}] [{levelname}] - {message}"
 logging.basicConfig(filename="logs/app.log", format=formatter, style="{")
 logger = logging.getLogger()
+
 # SMTP Mail handler settup
-mail_handler = SMTPHandler(
-    mailhost=("smtp.office365.com", 587),
-    fromaddr=bot_email,
-    toaddrs="dansmith@lawrenceks.org",
-    subject="eBuilder export error",
-    credentials=(bot_email, bot_password),
-    secure=(),
-)
-mail_handler.setFormatter(
-    logging.Formatter(
-        """
-    Message type:       %(levelname)s
-    Location:           %(pathname)s:%(lineno)d
-    Module:             %(module)s
-    Function:           %(funcName)s
-    Time:               %(asctime)s
+# mail_handler = SMTPHandler(
+#     mailhost=("smtp.office365.com", 587),
+#     fromaddr=bot_email,
+#     toaddrs="dansmith@lawrenceks.org",
+#     subject="eBuilder export error",
+#     credentials=(bot_email, bot_password),
+#     secure=(),
+# )
+# mail_handler.setFormatter(
+#     logging.Formatter(
+#         """
+#     Message type:       %(levelname)s
+#     Location:           %(pathname)s:%(lineno)d
+#     Module:             %(module)s
+#     Function:           %(funcName)s
+#     Time:               %(asctime)s
+#
+#     Message:
+#
+#     %(message)s
+#     """
+#     )
+# )
+# mail_handler.setLevel(logging.ERROR)
+# logger.addHandler(mail_handler)
 
-    Message:
 
-    %(message)s
-    """
-    )
-)
-mail_handler.setLevel(logging.ERROR)
-logger.addHandler(mail_handler)
-
-# global variables for requrests
-USER_EMAIL_ADDRESS = environ.get("EMAIL")
-email_password = environ.get("EMAILPASSWORD")
-api_username = environ.get("APIUSERNAME")
-password = environ.get("PASSWORD")
-token = ""
-munis_cred = environ.get("MUNIS_CREDENTIALS")
 # setting up logger
 """ logger = logging.getLogger('ebuilder-munis-logger')
 logger.setLevel(logging.DEBUG)
@@ -71,7 +73,8 @@ def error_handler(error_type, error_value, trace_back):
 sys.excepthook = error_handler """
 
 
-def get_project_details(project_code):
+def get_project_details(project_code, token) -> str:
+    """ Get project details from Munis API """
     proj_url = f"{munis_endpoint}munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '{project_code}'"
     proj_payload = {}
     proj_headers = {"Accept": "application/json", "Authorization": "Bearer " + token}
@@ -84,6 +87,7 @@ def get_project_details(project_code):
 
 
 def get_invoice_data(proj_id):
+    """Get invoices for a project from Munis API"""
     inv_url = (
         munis_endpoint
         + "munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '"
@@ -99,27 +103,21 @@ def get_invoice_data(proj_id):
 
 
 # e-builder token refresh function
-def refresh_token():
-    try:
-        url = "https://api2.e-builder.net/api/v2/Authenticate"
-        payload = (
-            "grant_type=password&username=" + api_username + "&password=" + password
-        )
-        payload = payload.replace("@", "%40")
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
-        }
+def get_ebuilder_token() -> str:
 
-        response = requests.request("POST", url, headers=headers, data=payload)
-        json_body = response.text
-        json_body = json.loads(json_body)
-        new_token = json_body["access_token"]
-        global token
-        token = new_token
+    url = "https://api2.e-builder.net/api/v2/Authenticate"
+    payload = f"grant_type=password&username={EB_API_USERNAME}&password={EB_API_PASSWORD}"
+    payload = payload.replace("@", "%40")
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+    }
 
-    except HTTPError as e:
-        logger.exception(e)
+    response = requests.request("POST", url, headers=headers, data=payload)
+    if response.status_code != 200:
+        logger.error("Error refreshing token")
+        sys.exit(1)
+    return json.loads(response.text)["access_token"]
 
 
 # Get Munis project ledger token
@@ -146,11 +144,12 @@ def get_munis_PL_token():
         "Sec-GPC": "1",
     }
     response = requests.request("POST", url, headers=headers, data=payload)
+    print(response.text)
     response_body = json.loads(response.text)
     return response_body["access_token"]
 
 
-def get_train_token():
+def get_train_token() -> str:
     url = "https://cityoflawrenceksforms-train.tylerhost.net/4907train/devportal/portal/api/clientCredential"
     payload = "grant_type=client_credentials&scope=munisOpenApiPOToolkit%20munisOpenApiPLToolkit%20tylerOpenApiServiceAccess"
     headers = {
@@ -173,14 +172,11 @@ def get_train_token():
     }
 
     response = requests.request("POST", url, headers=headers, data=payload)
-    response = response.json()
-    print(response)
-    return response["access_token"]
+    # print(response)
+    return response.json()["access_token"]
 
 
 # functions to get Munis Data to send to e-builder
-munis_token = get_munis_PL_token()
-
 
 # Do I need to get the PO data or the project list string? Probably PO data?
 # data probably need to connect back to a specific project
@@ -298,8 +294,7 @@ def get_commitment_invoice_by_id(token):
         raise e
 
 
-commitment_invoices = get_commitment_invoice_by_id(munis_token)
-commitment_invoices.to_csv("CommitmentInvoicesUpdate.csv", index=False)
+
 
 """
 Order of operations:
@@ -311,3 +306,14 @@ value ID, old value, new value, changed
     "lastModifiedDate": "2022-10-25T20:14:59.056Z",
 """
 # functions to get e-builder data to send to Munis
+
+if __name__ == '__main__':
+    ebuilder_token = get_ebuilder_token()
+    print(ebuilder_token)
+
+
+
+    # munis_token = get_munis_PL_token()
+    # commitment_invoices = get_commitment_invoice_by_id(munis_token)
+    # commitment_invoices.to_csv("CommitmentInvoicesUpdate.csv", index=False)
+
