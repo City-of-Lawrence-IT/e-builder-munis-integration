@@ -13,7 +13,11 @@ USER_EMAIL_ADDRESS = environ.get("EMAIL")
 email_password = environ.get("EMAILPASSWORD")
 EB_API_USERNAME = environ.get("EB_API_USERNAME")
 EB_API_PASSWORD = environ.get("EB_API_PASSWORD")
-munis_cred = environ.get("MUNIS_CREDENTIALS")
+MUNIS_API_TOKEN_URL = environ.get("MUNIS_API_TOKEN_URL")
+MUNIS_API_CLIENT_ID = environ.get("MUNIS_API_CLIENT_ID")
+MUNIS_API_CLIENT_SECRET = environ.get("MUNIS_API_CLIENT_SECRET")
+MUNIS_API_SCOPES = environ.get("MUNIS_API_SCOPES")
+MUNIS_API_BASE_URL = environ.get("MUNIS_API_BASE_URL")
 # email log errors
 bot_email = environ.get("EMAIL")
 bot_password = environ.get("PASSWORD")
@@ -121,32 +125,25 @@ def get_ebuilder_token() -> str:
 
 
 # Get Munis project ledger token
-def get_munis_PL_token():
-    url = "https://cityoflawrenceksforms.tylerhost.net/4907prod/devportal/portal/api/clientCredential"
+def get_munis_token():
+    response = requests.post(
+        MUNIS_API_TOKEN_URL,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={
+            "grant_type": "client_credentials",
+            "scope": MUNIS_API_SCOPES,
+            "client_id": MUNIS_API_CLIENT_ID,
+            "client_secret": MUNIS_API_CLIENT_SECRET,
+        },
+    )
 
-    payload = "grant_type=client_credentials&scope=munisOpenApiPOToolkit%20munisOpenApiPLToolkit%20tylerOpenApiServiceAccess"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://cityoflawrenceksforms-train.tylerhost.net/4907train/devportal/portal/open-api/collection",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Requested-With": "XMLHttpRequest",
-        "X-OpenApiDeveloperPortal-TokenEnpoint": "https://tyler-cityoflawrenceks.okta.com/oauth2/ausfis4bi0hkah3ES357/v1/token",
-        "X-OpenApiDeveloperPortal-Client": munis_cred,
-        "Origin": "https://cityoflawrenceksforms-train.tylerhost.net",
-        "DNT": "1",
-        "Connection": "keep-alive",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-GPC": "1",
-    }
-    response = requests.request("POST", url, headers=headers, data=payload)
-    print(response.text)
-    response_body = json.loads(response.text)
-    return response_body["access_token"]
+    # raise error on non 200 responses
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print("there was an error ", e)
+
+    return response.json().get('access_token')
 
 
 def get_train_token() -> str:
@@ -183,16 +180,20 @@ def get_train_token() -> str:
 # set PO == contractNumber field in get request
 def get_commitment_invoice_by_id(token):
     try:
-        endpoint = munis_endpoint + "munisopenapi/hosts/PO/api/PO/v1/purchaseOrders"
+        endpoint = MUNIS_API_BASE_URL + "/PO/api/PO/v1/purchaseOrders"
         print(endpoint)
         payload = {}
         headers = {"Accept": "application/json", "Authorization": "Bearer " + token}
         yesterday = date.today() - timedelta(days=1)
         today = date.today()
 
-        response = requests.request("GET", endpoint, headers=headers, data=payload)
+        response = requests.get(endpoint, headers=headers, data=payload)
+        if response.status_code == 401:
+            raise Exception("Unauthorized")
+
+        print(response.status_code)
         print(response.text)
-        response = response.text
+        # response = response.text
 
         column_names = {
             "Project Number": [],  # tied to contract
@@ -206,7 +207,7 @@ def get_commitment_invoice_by_id(token):
             "Vendor Invoice Number": [],  # Invoice number in Munis
         }
         df = pd.DataFrame(data=column_names)
-        data = json.loads(response)
+        data = response.json()
         for record in data:
             """with open('data.json', 'w', encoding='utf-8') as f:
             json.dump(record, f, ensure_ascii=False, indent=4)"""
@@ -308,12 +309,12 @@ value ID, old value, new value, changed
 # functions to get e-builder data to send to Munis
 
 if __name__ == '__main__':
-    ebuilder_token = get_ebuilder_token()
-    print(ebuilder_token)
+    # ebuilder_token = get_ebuilder_token()
+    # print(ebuilder_token)
 
-
-
-    # munis_token = get_munis_PL_token()
+    munis_token = get_munis_token()
+    # print(munis_token)
+    print(get_commitment_invoice_by_id(munis_token))
     # commitment_invoices = get_commitment_invoice_by_id(munis_token)
     # commitment_invoices.to_csv("CommitmentInvoicesUpdate.csv", index=False)
 
