@@ -124,7 +124,7 @@ def get_ebuilder_token() -> str:
     return json.loads(response.text)["access_token"]
 
 
-def get_ebuilder_commitments(token) -> str:
+def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     """get a list of all commitments from e-builder"""
     response = requests.get(
         f"{EB_API_BASE_URL}/CommitmentInvoices",
@@ -138,11 +138,21 @@ def get_ebuilder_commitments(token) -> str:
         logger.error("Error getting master invoices")
         sys.exit(1)
 
+    invoices = []
+
     for invoice in response.json().get('records'):
         if invoice['status'] != 'Paid':
+            invoices.append(
+                {
+                    'invoiceStatus': invoice['status'],
+                    'invoiceNumber': invoice['invoiceNumber'],
+                    'lastModifiedDate': invoice['lastModifiedDate'],
+                    'invoiceAmount': invoice['invoiceAmount'],
+                }
+            )
             print(invoice['status'], invoice['invoiceNumber'], invoice['lastModifiedDate'], invoice['invoiceAmount'])
 
-    return ''
+    return invoices
 
 
 def get_munis_token():
@@ -329,7 +339,8 @@ value ID, old value, new value, changed
 if __name__ == '__main__':
     ebuilder_token = get_ebuilder_token()
     print(ebuilder_token)
-    print(get_ebuilder_commitments(ebuilder_token))
+    ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
+
 
     #munis_token = get_munis_token()
     #print(munis_token)
