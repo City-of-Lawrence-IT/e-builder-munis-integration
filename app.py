@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from os import environ
 import sys, pyodbc, logging, requests, json, pprint
 from datetime import datetime, timedelta, date
+import pyodbc
 from logging.handlers import SMTPHandler
 from dateutil import parser
 import pandas as pd
@@ -79,7 +80,7 @@ sys.excepthook = error_handler """
 
 
 def get_project_details(project_code, token) -> str:
-    """ Get project details from Munis API """
+    """Get project details from Munis API"""
     proj_url = f"{munis_endpoint}munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '{project_code}'"
     proj_payload = {}
     proj_headers = {"Accept": "application/json", "Authorization": "Bearer " + token}
@@ -91,13 +92,53 @@ def get_project_details(project_code, token) -> str:
     return value["id"]
 
 
+def get_updated_invoices_from_munis(invoices: list) -> list:
+    """Checks munis for updated invoices"""
+    invoice_numbers = [invoice['invoiceNumber'] for invoice in invoices]
+    conn = pyodbc.connect(
+        "Driver={ODBC Driver 11 for SQL Server};Server=CITYSQLDWH;Database=mun4907prod;",
+        Trusted_Connection="yes",
+    )
+    cursor = conn.cursor()
+    placeholders = ", ".join(["?"] * len(invoice_numbers))  # creates a list of '?' for each invoice number
+
+    cursor.execute(
+        f"""
+    select
+        invoices.id,
+        Projects.Title,
+        number,
+        document,
+        invoices.[status],
+        invoices.InvoiceTotal,
+        c.ContractNumber
+    from Invoices
+        left join Contracts c on c.id = Invoices.ContractId
+        left join Projects on Projects.id = c.ProjectId
+    where Document IN ({placeholders})
+    """, invoice_numbers
+    )
+
+    return cursor.fetchall()
+
+
+def update_ebuilder_invoices(ebuilder_invoices, munis_invoices) -> list:
+    """Updates e-builder invoices"""
+    for ebuilder_invoice in ebuilder_invoices:
+        for munis_invoice in munis_invoices:
+            if ebuilder_invoice["invoiceNumber"] == munis_invoice.document:
+                if munis_invoice.status == "P":
+                    # ebuilder_invoice["Status"] = "Paid"
+                    print("Found a paid invoice")
+
+
 def get_invoice_data(proj_id):
     """Get invoices for a project from Munis API"""
     inv_url = (
-            munis_endpoint
-            + "munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '"
-            + project_code
-            + "'"
+        munis_endpoint
+        + "munisopenapi/hosts/PL/odata/PL/v1/projectStrings?$filter=projectCode eq '"
+        + project_code
+        + "'"
     )
     inv_payload = {}
     inv_headers = {"Accept": "application/json", "Authorization": "Bearer " + token}
@@ -110,7 +151,9 @@ def get_invoice_data(proj_id):
 # e-builder token refresh function
 def get_ebuilder_token() -> str:
     url = f"{EB_API_BASE_URL}/Authenticate"
-    payload = f"grant_type=password&username={EB_API_USERNAME}&password={EB_API_PASSWORD}"
+    payload = (
+        f"grant_type=password&username={EB_API_USERNAME}&password={EB_API_PASSWORD}"
+    )
     payload = payload.replace("@", "%40")
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -129,10 +172,7 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     response = requests.get(
         f"{EB_API_BASE_URL}/CommitmentInvoices",
         headers={"Authorization": f"Bearer {token}"},
-        params={'limit': 500,
-                'offset': 0,
-                'dateModified': '2023-05-17T09:41:55.992Z'
-                }
+        params={"limit": 50, "offset": 0, "dateModified": "2023-05-17T09:41:55.992Z"},
     )
     if response.status_code != 200:
         logger.error("Error getting master invoices")
@@ -140,17 +180,16 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
 
     invoices = []
 
-    for invoice in response.json().get('records'):
-        if invoice['status'] != 'Paid':
+    for invoice in response.json().get("records"):
+        if invoice["status"] != "Paid":
             invoices.append(
                 {
-                    'invoiceStatus': invoice['status'],
-                    'invoiceNumber': invoice['invoiceNumber'],
-                    'lastModifiedDate': invoice['lastModifiedDate'],
-                    'invoiceAmount': invoice['invoiceAmount'],
+                    "invoiceStatus": invoice["status"],
+                    "invoiceNumber": invoice["invoiceNumber"],
+                    "lastModifiedDate": invoice["lastModifiedDate"],
+                    "invoiceAmount": invoice["invoiceAmount"],
                 }
             )
-            print(invoice['status'], invoice['invoiceNumber'], invoice['lastModifiedDate'], invoice['invoiceAmount'])
 
     return invoices
 
@@ -174,7 +213,7 @@ def get_munis_token():
     except requests.exceptions.HTTPError as e:
         print("there was an error ", e)
 
-    return response.json().get('access_token')
+    return response.json().get("access_token")
 
 
 def get_train_token() -> str:
@@ -206,18 +245,20 @@ def get_train_token() -> str:
 
 # functions to get Munis Data to send to e-builder
 
+
 # Do I need to get the PO data or the project list string? Probably PO data?
 # data probably need to connect back to a specific project
 # set PO == contractNumber field in get request
 def get_commitment_invoice_by_id(token):
     try:
         yesterday = date.today() - timedelta(days=1)
-        response = requests.get(MUNIS_API_BASE_URL + "/PO/api/PO/v1/purchaseOrders",
-                                headers={"Accept": "application/json", "Authorization": "Bearer " + token},
-                                params={
-                                    "$filter": "projectCode eq 'UT-1985 '",
-                                }
-                                )
+        response = requests.get(
+            MUNIS_API_BASE_URL + "/PO/api/PO/v1/purchaseOrders",
+            headers={"Accept": "application/json", "Authorization": "Bearer " + token},
+            params={
+                "$filter": "projectCode eq 'UT-1985 '",
+            },
+        )
         if response.status_code == 401:
             raise Exception("Unauthorized")
 
@@ -286,7 +327,7 @@ def get_commitment_invoice_by_id(token):
                     new_df = pd.DataFrame([tempdf])
                     df = pd.concat([df, new_df], ignore_index=True)
             elif (
-                    entry_date.day == yesterday.day
+                entry_date.day == yesterday.day
             ):  # should be set to yesterday, checking to see if changes were made the day before
                 approval_date = ""
                 account_code = ""
@@ -336,14 +377,16 @@ value ID, old value, new value, changed
 """
 # functions to get e-builder data to send to Munis
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     ebuilder_token = get_ebuilder_token()
     print(ebuilder_token)
     ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
+    filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
+    updated_ebuilder_invoices = update_ebuilder_invoices(ebuilder_invoices, filtered_munis_invoices)
+    print(updated_ebuilder_invoices)
 
-
-    #munis_token = get_munis_token()
-    #print(munis_token)
-    #print(get_commitment_invoice_by_id(munis_token))
+    # munis_token = get_munis_token()
+    # print(munis_token)
+    # print(get_commitment_invoice_by_id(munis_token))
     # commitment_invoices = get_commitment_invoice_by_id(munis_token)
     # commitment_invoices.to_csv("CommitmentInvoicesUpdate.csv", index=False)
