@@ -1,12 +1,16 @@
-from urllib.error import HTTPError
 from dotenv import load_dotenv
+import json
+import logging
+import pprint
+import requests
+import sys
+from datetime import timedelta, date
 from os import environ
-import sys, pyodbc, logging, requests, json, pprint
-from datetime import datetime, timedelta, date
-import pyodbc
-from logging.handlers import SMTPHandler
-from dateutil import parser
+
 import pandas as pd
+import pyodbc
+from dateutil import parser
+from dotenv import load_dotenv
 
 load_dotenv()
 # global variables for requrests
@@ -94,7 +98,7 @@ def get_project_details(project_code, token) -> str:
 
 def get_updated_invoices_from_munis(invoices: list) -> list:
     """Checks munis for updated invoices"""
-    invoice_numbers = [invoice['invoiceNumber'] for invoice in invoices]
+    invoice_numbers: list = [invoice['invoiceNumber'] for invoice in invoices]
     conn = pyodbc.connect(
         "Driver={ODBC Driver 11 for SQL Server};Server=CITYSQLDWH;Database=mun4907prod;",
         Trusted_Connection="yes",
@@ -104,32 +108,45 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
 
     cursor.execute(
         f"""
-    select
+    SELECT
         invoices.id,
-        Projects.Title,
-        number,
-        document,
+        Projects.ProjectCode AS 'Project Number',
+        document AS 'Invoice Number',
         invoices.[status],
-        invoices.InvoiceTotal,
-        c.ContractNumber
-    from Invoices
-        left join Contracts c on c.id = Invoices.ContractId
-        left join Projects on Projects.id = c.ProjectId
-    where Document IN ({placeholders})
+        invoices.InvoiceTotal AS 'Financials Amount',
+        c.ContractNumber,
+        Invoices.CheckNumber AS 'Check Number',
+        Checks.CheckDate AS 'Check Date',
+        Checks.CheckAmount AS 'Check Amount',
+        Checks.ClearedDate AS 'Date Paid',
+        Checks.IsCleared AS 'IsCleared'
+    FROM Invoices
+        LEFT JOIN Contracts c ON c.id = Invoices.ContractId
+        LEFT JOIN Projects ON Projects.id = c.ProjectId
+        LEFT JOIN Checks on Checks.CheckNumber = Invoices.CheckNumber
+    WHERE Document IN ({placeholders})
     """, invoice_numbers
     )
 
     return cursor.fetchall()
 
 
-def update_ebuilder_invoices(ebuilder_invoices, munis_invoices) -> list:
+def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> list:
     """Updates e-builder invoices"""
-    for ebuilder_invoice in ebuilder_invoices:
+    updated_invoices: list[dict] = []
+    for ebuilder_invoice in eb_invoices:
         for munis_invoice in munis_invoices:
-            if ebuilder_invoice["invoiceNumber"] == munis_invoice.document:
-                if munis_invoice.status == "P":
-                    # ebuilder_invoice["Status"] = "Paid"
+            if ebuilder_invoice["invoiceNumber"] == munis_invoice[3]:
+                if munis_invoice.IsCleared == 1:
                     print("Found a paid invoice")
+                    updated_invoices.append(munis_invoice)
+    return updated_invoices
+
+
+def export_invoices_to_excel(invoices: list) -> None:
+    """Exports updated invoices list to excel using pandas"""
+    df = pd.DataFrame((tuple(invoice) for invoice in invoices), columns=['id', 'Title', 'Project Number', 'Invoice Number', 'status', 'Financials Amount', 'ContractNumber', 'Check Number', 'Check Date', 'Check Amount', 'Date Paid'])
+    df.to_excel("updated_invoices.xlsx", index=False)
 
 
 def get_invoice_data(proj_id):
@@ -181,6 +198,7 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     invoices = []
 
     for invoice in response.json().get("records"):
+        print(invoice)
         if invoice["status"] != "Paid":
             invoices.append(
                 {
@@ -188,6 +206,7 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
                     "invoiceNumber": invoice["invoiceNumber"],
                     "lastModifiedDate": invoice["lastModifiedDate"],
                     "invoiceAmount": invoice["invoiceAmount"],
+                    "datePaid": invoice["datePaid"],
                 }
             )
 
@@ -383,7 +402,8 @@ if __name__ == "__main__":
     ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
     filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
     updated_ebuilder_invoices = update_ebuilder_invoices(ebuilder_invoices, filtered_munis_invoices)
-    print(updated_ebuilder_invoices)
+    print(type(updated_ebuilder_invoices))
+    export_invoices_to_excel(updated_ebuilder_invoices)
 
     # munis_token = get_munis_token()
     # print(munis_token)
