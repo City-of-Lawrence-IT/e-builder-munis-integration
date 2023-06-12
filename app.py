@@ -101,18 +101,20 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
         -- invoices.id,
         Projects.ProjectCode AS 'Project Number',
         document AS 'Invoice Number',
+        Invoices.Number AS 'Vendor Invoice Number',
         invoices.[status],
         invoices.InvoiceTotal AS 'Financials Amount',
         -- c.ContractNumber,
         Invoices.CheckNumber AS 'Check Number',
         Checks.CheckDate AS 'Check Date',
         Checks.CheckAmount AS 'Check Amount',
-        Checks.CheckDate AS 'Date Paid'
-        -- Checks.IsCleared AS 'IsCleared'
+        Checks.CheckDate AS 'Date Paid',
+        Vendors.VendorNumber AS 'Company Number'
     FROM Invoices
         LEFT JOIN Contracts c ON c.id = Invoices.ContractId
         LEFT JOIN Projects ON Projects.id = c.ProjectId
         LEFT JOIN Checks on Checks.CheckNumber = Invoices.CheckNumber
+        LEFT JOIN Vendors on Vendors.id = Invoices.VendorId
     WHERE Document IN ({placeholders})
     AND Invoices.CheckNumber != 0
     """,
@@ -122,33 +124,41 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
     return cursor.fetchall()
 
 
-def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> list:
+def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> (list, list):
     """Updates e-builder invoices"""
     updated_invoices: list[dict] = []
+    invoice_exceptions: list[dict] = []
     for ebuilder_invoice in eb_invoices:
         for munis_invoice in munis_invoices:
             if ebuilder_invoice["invoiceNumber"] == munis_invoice[1]:
                 munis_invoice.status = 'Paid'
-                updated_invoices.append(munis_invoice)
-    return updated_invoices
+                print(munis_invoice[0])
+                if munis_invoice[0] == None:
+                    # no project number found in munis
+                    invoice_exceptions.append(munis_invoice)
+                else:
+                    updated_invoices.append(munis_invoice)
+    return updated_invoices, invoice_exceptions
 
 
-def export_invoices_to_excel(invoices: list) -> None:
+def export_invoices_to_excel(invoices: list, filename: str) -> None:
     """Exports updated invoices list to excel using pandas"""
     df = pd.DataFrame(
         (tuple(invoice) for invoice in invoices),
         columns=[
             "Project Number",
             "Invoice Number",
+            "Vendor Invoice Number",
             "Action",
             "Financials Amount",
             "Check Number",
             "Check Date",
             "Check Amount",
             "Date Paid",
+            'Company Number',
         ],
     )
-    df.to_excel("updated_invoices.xlsx", index=False)
+    df.to_excel(filename, index=False)
 
 
 
@@ -247,11 +257,12 @@ if __name__ == "__main__":
     # print(ebuilder_invoices)
     filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
     print(filtered_munis_invoices)
-    updated_ebuilder_invoices = update_ebuilder_invoices(
+    updated_ebuilder_invoices, invoice_exceptions = update_ebuilder_invoices(
         ebuilder_invoices, filtered_munis_invoices
     )
     print(updated_ebuilder_invoices)
-    export_invoices_to_excel(updated_ebuilder_invoices)
+    export_invoices_to_excel(updated_ebuilder_invoices, 'updated_invoices.xlsx')
+    export_invoices_to_excel(invoice_exceptions, 'invoice_exceptions.xlsx')
 
 
     # munis_token = get_munis_token()
