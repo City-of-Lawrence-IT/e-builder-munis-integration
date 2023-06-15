@@ -1,7 +1,5 @@
-from dotenv import load_dotenv
 import json
 import logging
-import pprint
 import requests
 import sys
 from datetime import timedelta, date
@@ -9,7 +7,6 @@ from os import environ
 
 import pandas as pd
 import pyodbc
-from dateutil import parser
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -132,7 +129,6 @@ def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> (list, 
         for munis_invoice in munis_invoices:
             if ebuilder_invoice["invoiceNumber"] == munis_invoice[1]:
                 munis_invoice.status = 'Paid'
-                print(munis_invoice[0])
                 if munis_invoice[0] == None:
                     # no project number found in munis
                     invoice_exceptions.append(munis_invoice)
@@ -159,7 +155,6 @@ def export_invoices_to_excel(invoices: list, filename: str) -> None:
         ],
     )
     df.to_excel(filename, index=False)
-
 
 
 # e-builder token refresh function
@@ -231,9 +226,7 @@ def get_munis_token():
     return response.json().get("access_token")
 
 
-
 # functions to get Munis Data to send to e-builder
-
 
 # Do I need to get the PO data or the project list string? Probably PO data?
 # data probably need to connect back to a specific project
@@ -248,25 +241,17 @@ value ID, old value, new value, changed
 
     "lastModifiedDate": "2022-10-25T20:14:59.056Z",
 """
-# functions to get e-builder data to send to Munis
 
 if __name__ == "__main__":
     ebuilder_token = get_ebuilder_token()
-    # print(ebuilder_token)
     ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
-    # print(ebuilder_invoices)
     filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
-    print(filtered_munis_invoices)
     updated_ebuilder_invoices, invoice_exceptions = update_ebuilder_invoices(
         ebuilder_invoices, filtered_munis_invoices
     )
     print(updated_ebuilder_invoices)
-    export_invoices_to_excel(updated_ebuilder_invoices, 'updated_invoices.xlsx')
-    export_invoices_to_excel(invoice_exceptions, 'invoice_exceptions.xlsx')
-
-
-    # munis_token = get_munis_token()
-    # print(munis_token)
-    # print(get_commitment_invoice_by_id(munis_token))
-    # commitment_invoices = get_commitment_invoice_by_id(munis_token)
-    # commitment_invoices.to_csv("CommitmentInvoicesUpdate.csv", index=False)
+    # this will go into the ftp folder to be picked up by e-builder
+    # \\citydata\MFT\ebuilder\CommitmentInvoices
+    export_invoices_to_excel(updated_ebuilder_invoices, 'CommitmentInvoicesUpdate.xlsx')
+    #  this will need to be emailed to the finance team
+    export_invoices_to_excel(invoice_exceptions, 'CommitmentInvoicesExceptions.xlsx')
