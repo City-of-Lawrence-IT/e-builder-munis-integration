@@ -65,6 +65,8 @@ mail_handler.setFormatter(
 )
 mail_handler.setLevel(logging.ERROR)
 logger.addHandler(mail_handler)
+logger.addHandler(stream_handler)
+logger.addHandler(file_handler)
 
 logger.error("test")
 
