@@ -1,18 +1,17 @@
 import json
 import logging
+from logging.handlers import SMTPHandler
 import requests
 import sys
-from datetime import timedelta, date
 from os import environ
 
 import pandas as pd
 import pyodbc
 from dotenv import load_dotenv
 
+# global variables
 load_dotenv()
-# global variables for requrests
 USER_EMAIL_ADDRESS = environ.get("EMAIL")
-email_password = environ.get("EMAILPASSWORD")
 EB_API_BASE_URL = environ.get("EB_API_BASE_URL")
 EB_API_USERNAME = environ.get("EB_API_USERNAME")
 EB_API_PASSWORD = environ.get("EB_API_PASSWORD")
@@ -22,62 +21,52 @@ MUNIS_API_CLIENT_SECRET = environ.get("MUNIS_API_CLIENT_SECRET")
 MUNIS_API_SCOPES = environ.get("MUNIS_API_SCOPES")
 MUNIS_API_BASE_URL = environ.get("MUNIS_API_BASE_URL")
 # email log errors
-bot_email = environ.get("EMAIL")
-bot_password = environ.get("PASSWORD")
-munis_endpoint = environ.get("MUNIS_ENDPOINT")
+LOGGER_EMAIL = environ.get("LOGGER_EMAIL")
+LOGGER_PASS = environ.get("LOGGER_PASS")
 
-# Apply format to the log messages
-formatter = "[{asctime}] [{name}] [{levelname}] - {message}"
-logging.basicConfig(filename="logs/app.log", format=formatter, style="{")
-logger = logging.getLogger()
+# Logging setup
+logger = logging.getLogger(__name__)
 
-# SMTP Mail handler settup
-# mail_handler = SMTPHandler(
-#     mailhost=("smtp.office365.com", 587),
-#     fromaddr=bot_email,
-#     toaddrs="dansmith@lawrenceks.org",
-#     subject="eBuilder export error",
-#     credentials=(bot_email, bot_password),
-#     secure=(),
-# )
-# mail_handler.setFormatter(
-#     logging.Formatter(
-#         """
-#     Message type:       %(levelname)s
-#     Location:           %(pathname)s:%(lineno)d
-#     Module:             %(module)s
-#     Function:           %(funcName)s
-#     Time:               %(asctime)s
-#
-#     Message:
-#
-#     %(message)s
-#     """
-#     )
-# )
-# mail_handler.setLevel(logging.ERROR)
-# logger.addHandler(mail_handler)
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.DEBUG)
 
+file_handler = logging.FileHandler("logs/app.log")
+file_handler.setLevel(logging.ERROR)
 
-# setting up logger
-""" logger = logging.getLogger('ebuilder-munis-logger')
-logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-file_logger = logging.FileHandler('test.log')
-file_logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(lineno)d %(message)s')
-ch.setFormatter(formatter)
-file_logger.setFormatter(formatter)
-logger.addHandler(ch)
-logger.addHandler(file_logger)
+formatter = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(funcName)s - %(lineno)d %(message)s"
+)
+stream_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
 
-def error_handler(error_type, error_value, trace_back):
-    print(trace_back)
-    logger.exception('Uncaught exception: {}'.format(str(error_value)))
+# SMTP Mail handler setup
+mail_handler = logging.handlers.SMTPHandler(
+    mailhost=("smtp.office365.com", 587),
+    fromaddr=LOGGER_EMAIL,
+    toaddrs="ngodfrey@lawrenceks.org",
+    subject="eBuilder export error",
+    credentials=(LOGGER_EMAIL, LOGGER_PASS),
+    secure=(),
+)
+mail_handler.setFormatter(
+    logging.Formatter(
+        """
+    Message type:       %(levelname)s
+    Location:           %(pathname)s:%(lineno)d
+    Module:             %(module)s
+    Function:           %(funcName)s
+    Time:               %(asctime)s
 
+    Message:
 
-sys.excepthook = error_handler """
+    %(message)s
+    """
+    )
+)
+mail_handler.setLevel(logging.ERROR)
+logger.addHandler(mail_handler)
+
+logger.error("test")
 
 
 def get_updated_invoices_from_munis(invoices: list) -> list:
@@ -124,17 +113,17 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
 def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> (list, list):
     """Updates e-builder invoices"""
     updated_invoices: list[dict] = []
-    invoice_exceptions: list[dict] = []
+    inv_exceptions: list[dict] = []
     for ebuilder_invoice in eb_invoices:
         for munis_invoice in munis_invoices:
             if ebuilder_invoice["invoiceNumber"] == munis_invoice[1]:
-                munis_invoice.status = 'Paid'
+                munis_invoice.status = "Paid"
                 if munis_invoice[0] == None:
                     # no project number found in munis
-                    invoice_exceptions.append(munis_invoice)
+                    inv_exceptions.append(munis_invoice)
                 else:
                     updated_invoices.append(munis_invoice)
-    return updated_invoices, invoice_exceptions
+    return updated_invoices, inv_exceptions
 
 
 def export_invoices_to_excel(invoices: list, filename: str) -> None:
@@ -151,7 +140,7 @@ def export_invoices_to_excel(invoices: list, filename: str) -> None:
             "Check Date",
             "Check Amount",
             "Date Paid",
-            'Company Number',
+            "Company Number",
         ],
     )
     df.to_excel(filename, index=False)
@@ -188,7 +177,6 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
         sys.exit(1)
 
     invoices = []
-
     for invoice in response.json().get("records"):
         if invoice["status"] != "Paid":
             invoices.append(
@@ -242,9 +230,11 @@ value ID, old value, new value, changed
     "lastModifiedDate": "2022-10-25T20:14:59.056Z",
 """
 
-if __name__ == "__main__":
+
+def main():
     ebuilder_token = get_ebuilder_token()
     ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
+    print(ebuilder_invoices)
     filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
     updated_ebuilder_invoices, invoice_exceptions = update_ebuilder_invoices(
         ebuilder_invoices, filtered_munis_invoices
@@ -252,6 +242,14 @@ if __name__ == "__main__":
     print(updated_ebuilder_invoices)
     # this will go into the ftp folder to be picked up by e-builder
     # \\citydata\MFT\ebuilder\CommitmentInvoices
-    export_invoices_to_excel(updated_ebuilder_invoices, 'CommitmentInvoicesUpdate.xlsx')
+    export_invoices_to_excel(
+        updated_ebuilder_invoices,
+        "//citydata/MFT/ebuilder/CommitmentInvoices/CommitmentInvoicesUpdate.xlsx",
+    )
     #  this will need to be emailed to the finance team
-    export_invoices_to_excel(invoice_exceptions, 'CommitmentInvoicesExceptions.xlsx')
+    export_invoices_to_excel(invoice_exceptions, "CommitmentInvoicesExceptions.xlsx")
+
+
+if __name__ == "__main__":
+    # main()
+    pass
