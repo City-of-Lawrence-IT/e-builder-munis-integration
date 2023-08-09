@@ -3,26 +3,11 @@ import logging
 from logging.handlers import SMTPHandler
 import requests
 import sys
-from os import environ
+from config import CONFIG
 
 import pandas as pd
 import pyodbc
-from dotenv import load_dotenv
 
-# global variables
-load_dotenv()
-USER_EMAIL_ADDRESS = environ.get("EMAIL")
-EB_API_BASE_URL = environ.get("EB_API_BASE_URL")
-EB_API_USERNAME = environ.get("EB_API_USERNAME")
-EB_API_PASSWORD = environ.get("EB_API_PASSWORD")
-MUNIS_API_TOKEN_URL = environ.get("MUNIS_API_TOKEN_URL")
-MUNIS_API_CLIENT_ID = environ.get("MUNIS_API_CLIENT_ID")
-MUNIS_API_CLIENT_SECRET = environ.get("MUNIS_API_CLIENT_SECRET")
-MUNIS_API_SCOPES = environ.get("MUNIS_API_SCOPES")
-MUNIS_API_BASE_URL = environ.get("MUNIS_API_BASE_URL")
-# email log errors
-LOGGER_EMAIL = environ.get("LOGGER_EMAIL")
-LOGGER_PASS = environ.get("LOGGER_PASS")
 
 # Logging setup
 logger = logging.getLogger(__name__)
@@ -42,10 +27,10 @@ file_handler.setFormatter(formatter)
 # SMTP Mail handler setup
 mail_handler = logging.handlers.SMTPHandler(
     mailhost=("smtp.office365.com", 587),
-    fromaddr=LOGGER_EMAIL,
+    fromaddr=CONFIG["LOGGER_EMAIL"],
     toaddrs="ngodfrey@lawrenceks.org",
     subject="eBuilder export error",
-    credentials=(LOGGER_EMAIL, LOGGER_PASS),
+    credentials=(CONFIG["LOGGER_EMAIL"], CONFIG["LOGGER_PASS"]),
     secure=(),
 )
 mail_handler.setFormatter(
@@ -150,9 +135,9 @@ def export_invoices_to_excel(invoices: list, filename: str) -> None:
 
 # e-builder token refresh function
 def get_ebuilder_token() -> str:
-    url = f"{EB_API_BASE_URL}/Authenticate"
+    url = f"{CONFIG['EB_API_BASE_URL']}/Authenticate"
     payload = (
-        f"grant_type=password&username={EB_API_USERNAME}&password={EB_API_PASSWORD}"
+        f"grant_type=password&username={CONFIG['EB_API_USERNAME']}&password={CONFIG['EB_API_PASSWORD']}"
     )
     payload = payload.replace("@", "%40")
     headers = {
@@ -170,7 +155,7 @@ def get_ebuilder_token() -> str:
 def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     """get a list of all commitments from e-builder"""
     response = requests.get(
-        f"{EB_API_BASE_URL}/CommitmentInvoices",
+        f"{CONFIG['EB_API_BASE_URL']}/CommitmentInvoices",
         headers={"Authorization": f"Bearer {token}"},
         params={"limit": 500, "offset": 0, "dateModified": "2023-05-17T09:41:55.992Z"},
     )
@@ -197,13 +182,13 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
 def get_munis_token():
     """Get Munis project ledger token"""
     response = requests.post(
-        MUNIS_API_TOKEN_URL,
+        CONFIG["MUNIS_API_TOKEN_URL"],
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         data={
             "grant_type": "client_credentials",
-            "scope": MUNIS_API_SCOPES,
-            "client_id": MUNIS_API_CLIENT_ID,
-            "client_secret": MUNIS_API_CLIENT_SECRET,
+            "scope": CONFIG["MUNIS_API_SCOPES"],
+            "client_id": CONFIG["MUNIS_API_CLIENT_ID"],
+            "client_secret": CONFIG["MUNIS_API_CLIENT_SECRET"],
         },
     )
 
