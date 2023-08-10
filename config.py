@@ -15,4 +15,5 @@ CONFIG = {
     # email log errors
     'LOGGER_EMAIL': environ.get("LOGGER_EMAIL"),
     'LOGGER_PASS': environ.get("LOGGER_PASS"),
+    'ENVIRONMENT': environ.get("ENVIRONMENT"),
 }

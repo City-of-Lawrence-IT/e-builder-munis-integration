@@ -3,11 +3,12 @@ import logging
 from logging.handlers import SMTPHandler
 import requests
 import sys
-from config import CONFIG
 
 import pandas as pd
 import pyodbc
 
+from config import CONFIG
+from helpers import get_ebuilder_token
 
 # Logging setup
 logger = logging.getLogger(__name__)
@@ -49,15 +50,17 @@ mail_handler.setFormatter(
     )
 )
 mail_handler.setLevel(logging.ERROR)
-logger.addHandler(mail_handler)
+
+
 logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
-logger.error("test")
-
+if CONFIG["ENVIRONMENT"] == "PROD":
+    logger.addHandler(mail_handler)
 
 def get_updated_invoices_from_munis(invoices: list) -> list:
     """Checks munis for updated invoices"""
+    logger.info("Checking Munis for updated invoices")
     invoice_numbers: list = [invoice["invoiceNumber"] for invoice in invoices]
     conn = pyodbc.connect(
         "Driver={ODBC Driver 11 for SQL Server};Server=CITYSQLDWH;Database=mun4907prod;",
@@ -99,6 +102,7 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
 
 def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> (list, list):
     """Updates e-builder invoices"""
+    logger.info("Updating e-builder invoices")
     updated_invoices: list[dict] = []
     inv_exceptions: list[dict] = []
     for ebuilder_invoice in eb_invoices:
@@ -115,6 +119,7 @@ def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> (list, 
 
 def export_invoices_to_excel(invoices: list, filename: str) -> None:
     """Exports updated invoices list to excel using pandas"""
+    logger.info("Exporting invoices to excel")
     df = pd.DataFrame(
         (tuple(invoice) for invoice in invoices),
         columns=[
@@ -133,27 +138,9 @@ def export_invoices_to_excel(invoices: list, filename: str) -> None:
     df.to_excel(filename, index=False)
 
 
-# e-builder token refresh function
-def get_ebuilder_token() -> str:
-    url = f"{CONFIG['EB_API_BASE_URL']}/Authenticate"
-    payload = (
-        f"grant_type=password&username={CONFIG['EB_API_USERNAME']}&password={CONFIG['EB_API_PASSWORD']}"
-    )
-    payload = payload.replace("@", "%40")
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
-    }
-
-    response = requests.request("POST", url, headers=headers, data=payload)
-    if response.status_code != 200:
-        logger.error("Error refreshing token")
-        sys.exit(1)
-    return json.loads(response.text)["access_token"]
-
-
 def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     """get a list of all commitments from e-builder"""
+    logger.info("Getting master invoices from e-builder")
     response = requests.get(
         f"{CONFIG['EB_API_BASE_URL']}/CommitmentInvoices",
         headers={"Authorization": f"Bearer {token}"},
@@ -238,5 +225,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
+    main()
     pass
