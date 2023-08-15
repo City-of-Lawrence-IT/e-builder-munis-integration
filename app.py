@@ -58,6 +58,7 @@ logger.addHandler(file_handler)
 if CONFIG["ENVIRONMENT"] == "PROD":
     logger.addHandler(mail_handler)
 
+
 def get_updated_invoices_from_munis(invoices: list) -> list:
     """Checks munis for updated invoices"""
     logger.info("Checking Munis for updated invoices")
