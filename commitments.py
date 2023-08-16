@@ -21,8 +21,8 @@ def get_ebuilder_commitments(token) -> list:
                 "limit": 1000,
                 "offset": 0,
                 "dateModified": (
-                        datetime.datetime.now(datetime.timezone.utc)
-                        - datetime.timedelta(days=180)
+                    datetime.datetime.now(datetime.timezone.utc)
+                    - datetime.timedelta(days=180)
                 )
                 .isoformat()
                 .replace("+00:00", "Z"),
@@ -53,10 +53,10 @@ def get_ebuilder_project_from_id(token, project_id: str) -> str:
             headers={"Authorization": f"Bearer {token}"},
         )
         response.raise_for_status()
-        for item in response.json()['details']:
-            if item['name'] == 'Project Number':
-                return item['value']
-        return ''
+        for item in response.json()["details"]:
+            if item["name"] == "Project Number":
+                return item["value"]
+        return ""
     except requests.exceptions.HTTPError as err:
         logger.error(err)
         raise SystemExit(err)
@@ -88,12 +88,14 @@ def get_approved_commitments_from_munis(commitments):
         if not commitment["commitmentNumber"].isdigit():
             continue
 
-        commitment_list.append((
-            get_ebuilder_project_from_id(token, commitment['projectID']),
-            commitment["commitmentNumber"].strip(),
-            '',
-            commitment['currentCommitmentValue'],
-        ))
+        commitment_list.append(
+            (
+                get_ebuilder_project_from_id(token, commitment["projectID"]),
+                commitment["commitmentNumber"].strip(),
+                "",
+                commitment["currentCommitmentValue"],
+            )
+        )
 
     commitment_numbers = ",".join([str(c[1]) for c in commitment_list])
 
@@ -110,8 +112,8 @@ def get_approved_commitments_from_munis(commitments):
             max(Description),
             max(ApprovedDate),
             max(ContractNumber),
+            max(Status),
             SUM(CAL.revisedAmount) AS CommitmentAmount
-
         FROM [mun4907prod].[dbo].[Contracts]
         left join ContractAmountLines CAL on Contracts.Id = CAL.ContractId
         WHERE ContractNumber IN ({commitment_numbers})
@@ -119,9 +121,12 @@ def get_approved_commitments_from_munis(commitments):
     cursor.execute(query)
 
     results = cursor.fetchall()
+    print(results)
     for row in results:
         for commitment in commitment_list:
             if row[2].strip() == commitment[1]:
+                if row[3] == "10":
+                    logger.info("Found an updated commitment")
                 print(row, commitment)
 
     logger.info("Checking Purchase Orders in Munis")
@@ -151,10 +156,10 @@ def export_commitments_to_excel(commitments: list, filename: str) -> None:
         (tuple(c) for c in commitments),
         columns=[
             "Project Number",
-            'Commitment Number',
+            "Commitment Number",
             "Action",
-            'Financials Amount',
-            'PO Number',
+            "Financials Amount",
+            "PO Number",
         ],
     )
     df.to_excel(filename, index=False)

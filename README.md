@@ -55,3 +55,9 @@ Automate the process of adding notifications to tell PM that changes need to be 
 power bi dashboard?
 test
 
+Notes
+
+Munis status in DB for contracts
+10 = closed
+8 = Posted
+0 = rejected
