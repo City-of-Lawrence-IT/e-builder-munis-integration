@@ -9,6 +9,7 @@ from commitments import (
     get_ebuilder_commitments,
     get_ebuilder_project_from_id,
     get_approved_commitments_from_munis,
+    filter_commitments,
 )
 from commitment_invoices import (
     get_ebuilder_unpaid_commitment_invoices,
@@ -18,10 +19,11 @@ from commitment_invoices import (
 )
 
 # Logging setup
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.DEBUG)
+stream_handler.setLevel(logging.INFO)
 
 file_handler = logging.FileHandler("logs/app.log")
 file_handler.setLevel(logging.ERROR)
@@ -65,7 +67,7 @@ logger.addHandler(file_handler)
 if CONFIG["ENVIRONMENT"] == "PROD":
     logger.addHandler(mail_handler)
 
-
+# Functions for authentication
 def get_munis_token():
     """Get Munis project ledger token"""
     response = requests.post(
@@ -88,42 +90,36 @@ def get_munis_token():
     return response.json().get("access_token")
 
 
-# functions to get Munis Data to send to e-builder
-
-# Do I need to get the PO data or the project list string? Probably PO data?
-# data probably need to connect back to a specific project
-# set PO == contractNumber field in get request
-
-"""
-Order of operations:
-- get list of purchase orders
-- filter by changes made in last 24 hours
-- get change order status 
-value ID, old value, new value, changed
-
-    "lastModifiedDate": "2022-10-25T20:14:59.056Z",
-"""
-
-
 def main():
-    ebuilder_token = get_ebuilder_token()
-    ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
-    print(ebuilder_invoices)
-    filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
-    updated_ebuilder_invoices, invoice_exceptions = update_ebuilder_invoices(
-        ebuilder_invoices, filtered_munis_invoices
-    )
-    print(updated_ebuilder_invoices)
-    # this will go into the ftp folder to be picked up by e-builder
-    # \\citydata\MFT\ebuilder\CommitmentInvoices
-    export_invoices_to_excel(
-        updated_ebuilder_invoices,
-        "//citydata/MFT/ebuilder/CommitmentInvoices/CommitmentInvoicesUpdate.xlsx",
-    )
-    #  this will need to be emailed to the finance team
-    export_invoices_to_excel(invoice_exceptions, "CommitmentInvoicesExceptions.xlsx")
+    print(CONFIG["COMMITMENT_INVOICES_ENABLED"])
+    if CONFIG["COMMITMENT_INVOICES_ENABLED"]:
+        logger.info("Running commitment invoices API integration")
+        ebuilder_token = get_ebuilder_token()
+        ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
+        print(ebuilder_invoices)
+        filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
+        updated_ebuilder_invoices, invoice_exceptions = update_ebuilder_invoices(
+            ebuilder_invoices, filtered_munis_invoices
+        )
+        print(updated_ebuilder_invoices)
+        # this will go into the ftp folder to be picked up by e-builder
+        # \\citydata\MFT\ebuilder\CommitmentInvoices
+        export_invoices_to_excel(
+            updated_ebuilder_invoices,
+            "//citydata/MFT/ebuilder/CommitmentInvoices/CommitmentInvoicesUpdate.xlsx",
+        )
+        #  this will need to be emailed to the finance team
+        export_invoices_to_excel(invoice_exceptions, "CommitmentInvoicesExceptions.xlsx")
+
+    if CONFIG["COMMITMENTS_ENABLED"]:
+        token = get_ebuilder_token()
+        unfiltered_invoices = get_ebuilder_commitments(token)
+        filtered_invoices = filter_commitments(token, unfiltered_invoices)
+        # x = [print(i["commitmentNumber"]) for i in filtered_invoices]
+        get_approved_commitments_from_munis(token, filtered_invoices)
+        # print(filtered_invoices)
+        # print(get_ebuilder_project_from_id(token, '2e6d7b04-e966-4e7d-89f3-d926b4b8594f'))
 
 
 if __name__ == "__main__":
     main()
-    pass
