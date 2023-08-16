@@ -91,7 +91,6 @@ def get_munis_token():
 
 
 def main():
-    print(CONFIG["COMMITMENT_INVOICES_ENABLED"])
     if CONFIG["COMMITMENT_INVOICES_ENABLED"]:
         logger.info("Running commitment invoices API integration")
         ebuilder_token = get_ebuilder_token()

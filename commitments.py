@@ -5,8 +5,6 @@ import pyodbc
 import requests
 import pandas as pd
 
-from helpers import get_ebuilder_token
-
 logger = logging.getLogger(__name__)
 
 
@@ -127,6 +125,25 @@ def get_approved_commitments_from_munis(token, commitments):
             if row[2].strip() == commitment[1]:
                 if row[3] == "10":
                     logger.info("Found an updated commitment")
+                    updated_commitments.append(
+                        (
+                            commitment[0],
+                            commitment[1],
+                            "Approved",
+                            row[4],
+                        )
+                    )
+                else:
+                    if row[3] == "0":
+                        logger.info("Found a rejected commitment")
+                        updated_commitments.append(
+                            (
+                                commitment[0],
+                                commitment[1],
+                                "Void",
+                                row[4],
+                            )
+                        )
                 print(row, commitment)
 
     logger.info("Checking Purchase Orders in Munis")
@@ -164,12 +181,3 @@ def export_commitments_to_excel(commitments: list, filename: str) -> None:
     )
     df.to_excel(filename, index=False)
 
-
-if __name__ == "__main__":
-    token = get_ebuilder_token()
-    unfiltered_invoices = get_ebuilder_commitments(token)
-    filtered_invoices = filter_commitments(token, unfiltered_invoices)
-    # x = [print(i["commitmentNumber"]) for i in filtered_invoices]
-    get_approved_commitments_from_munis(filtered_invoices)
-    # print(filtered_invoices)
-    # print(get_ebuilder_project_from_id(token, '2e6d7b04-e966-4e7d-89f3-d926b4b8594f'))

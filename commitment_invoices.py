@@ -8,7 +8,6 @@ import pandas as pd
 from helpers import get_ebuilder_token
 
 logger = logging.getLogger(__name__)
-print(logger)
 
 
 def get_ebuilder_unpaid_commitment_invoices(token) -> list:
