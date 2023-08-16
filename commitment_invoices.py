@@ -8,11 +8,12 @@ import pandas as pd
 from helpers import get_ebuilder_token
 
 logger = logging.getLogger(__name__)
+print(logger)
 
 
 def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     """get a list of all commitments from e-builder"""
-    logger.info("Getting master invoices from e-builder")
+    logger.info("Getting invoices from e-builder")
     response = requests.get(
         f"{CONFIG['EB_API_BASE_URL']}/CommitmentInvoices",
         headers={"Authorization": f"Bearer {token}"},

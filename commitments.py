@@ -80,7 +80,7 @@ def filter_commitments(token, commitments):
     return filtered_commitments
 
 
-def get_approved_commitments_from_munis(commitments):
+def get_approved_commitments_from_munis(token, commitments):
     """Gets approved commitments from Munis"""
     commitment_list = []
     for commitment in commitments:

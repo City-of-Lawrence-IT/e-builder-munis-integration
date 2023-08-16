@@ -16,4 +16,7 @@ CONFIG = {
     'LOGGER_EMAIL': environ.get("LOGGER_EMAIL"),
     'LOGGER_PASS': environ.get("LOGGER_PASS"),
     'ENVIRONMENT': environ.get("ENVIRONMENT"),
+    # set these to only run the api you are working on in development or to disable in production
+    'COMMITMENTS_ENABLED': environ.get("COMMITMENTS_ENABLED", 'False').lower() in ('true', '1', 't'),
+    'COMMITMENT_INVOICES_ENABLED': environ.get("COMMITMENT_INVOICES_ENABLED", 'False').lower() in ('true', '1', 't'),
 }
