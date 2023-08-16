@@ -61,3 +61,8 @@ Munis status in DB for contracts
 10 = closed
 8 = Posted
 0 = rejected
+
+Munis status in DB for PO
+0 = Closed
+8 = Printed
+9 = Carry Forward

@@ -10,6 +10,7 @@ from commitments import (
     get_ebuilder_project_from_id,
     get_approved_commitments_from_munis,
     filter_commitments,
+    export_commitments_to_excel,
 )
 from commitment_invoices import (
     get_ebuilder_unpaid_commitment_invoices,
@@ -115,7 +116,9 @@ def main():
         unfiltered_invoices = get_ebuilder_commitments(token)
         filtered_invoices = filter_commitments(token, unfiltered_invoices)
         # x = [print(i["commitmentNumber"]) for i in filtered_invoices]
-        get_approved_commitments_from_munis(token, filtered_invoices)
+        updated_commitments = get_approved_commitments_from_munis(token, filtered_invoices)
+        export_commitments_to_excel(updated_commitments, "CommitmentsUpdate.xlsx")
+        print(updated_commitments)
         # print(filtered_invoices)
         # print(get_ebuilder_project_from_id(token, '2e6d7b04-e966-4e7d-89f3-d926b4b8594f'))
 

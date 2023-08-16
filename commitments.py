@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 def get_ebuilder_commitments(token) -> list:
     """Gets commitments from eBuilder"""
+    logger.info("Getting commitments from eBuilder")
     try:
         url = f"{CONFIG['EB_API_BASE_URL']}/commitments"
         response = requests.get(
@@ -71,6 +72,7 @@ def get_ebuilder_project_from_id(token, project_id: str) -> str:
 
 def filter_commitments(token, commitments):
     """Filters commitments to only include those that are not approved"""
+    logger.info("Filtering commitments")
     filtered_commitments = []
     for commitment in commitments["records"]:
         if commitment["status"] != "Approved":
@@ -92,6 +94,7 @@ def get_approved_commitments_from_munis(token, commitments):
                 commitment["commitmentNumber"].strip(),
                 "",
                 commitment["currentCommitmentValue"],
+                commitment["commitmentNumber"].strip(),
             )
         )
 
@@ -115,6 +118,7 @@ def get_approved_commitments_from_munis(token, commitments):
         FROM [mun4907prod].[dbo].[Contracts]
         left join ContractAmountLines CAL on Contracts.Id = CAL.ContractId
         WHERE ContractNumber IN ({commitment_numbers})
+        GROUP BY ContractNumber
     """
     cursor.execute(query)
 
@@ -123,7 +127,7 @@ def get_approved_commitments_from_munis(token, commitments):
     for row in results:
         for commitment in commitment_list:
             if row[2].strip() == commitment[1]:
-                if row[3] == "10":
+                if row[3] == "8":
                     logger.info("Found an updated commitment")
                     updated_commitments.append(
                         (
@@ -131,10 +135,12 @@ def get_approved_commitments_from_munis(token, commitments):
                             commitment[1],
                             "Approved",
                             row[4],
+                            commitment[4],
                         )
                     )
                 else:
                     if row[3] == "0":
+                        # untested
                         logger.info("Found a rejected commitment")
                         updated_commitments.append(
                             (
@@ -142,25 +148,52 @@ def get_approved_commitments_from_munis(token, commitments):
                                 commitment[1],
                                 "Void",
                                 row[4],
+                                commitment[4],
                             )
                         )
-                print(row, commitment)
 
     logger.info("Checking Purchase Orders in Munis")
     query = f"""
         SELECT
             PurchaseOrderNumber,
-            [IsApproved]
+            [IsApproved],
+            Status,
+            
         FROM [mun4907prod].[dbo].[PurchaseOrders]
         WHERE PurchaseOrderNumber IN ({commitment_numbers})
     """
     cursor.execute(query)
+    logger.debug(f"query: {query}")
     print(cursor.fetchall())
     results = cursor.fetchall()
 
     for row in results:
         for commitment in commitment_list:
             if row[2].strip() == commitment[1]:
+                if row[3] == "8":
+                    logger.info("Found an updated commitment")
+                    updated_commitments.append(
+                        (
+                            commitment[0],
+                            commitment[1],
+                            "Approved",
+                            row[4],
+                            commitment[4],
+                        )
+                    )
+                else:
+                    if row[3] == "0":
+                        # untested
+                        logger.info("Found a rejected commitment")
+                        updated_commitments.append(
+                            (
+                                commitment[0],
+                                commitment[1],
+                                "Void",
+                                row[4],
+                                commitment[4],
+                            )
+                        )
                 print(row, commitment)
 
     return updated_commitments
@@ -180,4 +213,3 @@ def export_commitments_to_excel(commitments: list, filename: str) -> None:
         ],
     )
     df.to_excel(filename, index=False)
-
