@@ -61,12 +61,12 @@ mail_handler.setFormatter(
 )
 mail_handler.setLevel(logging.ERROR)
 
-
 logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
 if CONFIG["ENVIRONMENT"] == "PROD":
     logger.addHandler(mail_handler)
+
 
 # Functions for authentication
 def get_munis_token():
@@ -109,16 +109,27 @@ def main():
             "//citydata/MFT/ebuilder/CommitmentInvoices/CommitmentInvoicesUpdate.xlsx",
         )
         #  this will need to be emailed to the finance team
-        export_invoices_to_excel(invoice_exceptions, "CommitmentInvoicesExceptions.xlsx")
+        export_invoices_to_excel(
+            invoice_exceptions, "CommitmentInvoicesExceptions.xlsx"
+        )
 
     if CONFIG["COMMITMENTS_ENABLED"]:
         token = get_ebuilder_token()
         unfiltered_invoices = get_ebuilder_commitments(token)
         filtered_invoices = filter_commitments(token, unfiltered_invoices)
-        # x = [print(i["commitmentNumber"]) for i in filtered_invoices]
-        updated_commitments = get_approved_commitments_from_munis(token, filtered_invoices)
-        export_commitments_to_excel(updated_commitments, "CommitmentsUpdate.xlsx")
+        #x = [print(i) for i in filtered_invoices]
+        fake_commitment = [{
+            "projectID": "fa4552de-1fd6-48a1-8c82-105925ffcd6e",
+            "commitmentNumber": "22300470",
+            "currentCommitmentValue": 29740.0,
+
+        }]
+
+        updated_commitments = get_approved_commitments_from_munis(
+            token, fake_commitment
+        )
         print(updated_commitments)
+        #export_commitments_to_excel(updated_commitments, "CommitmentsUpdate.xlsx")
         # print(filtered_invoices)
         # print(get_ebuilder_project_from_id(token, '2e6d7b04-e966-4e7d-89f3-d926b4b8594f'))
 

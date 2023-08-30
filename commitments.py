@@ -80,6 +80,37 @@ def filter_commitments(token, commitments):
     return filtered_commitments
 
 
+def calculate_commitment_total(commitments):
+    """Calculates the total of a commitment"""
+    totaled_commitments = []
+    # set the current commitment to the first commitment
+    current_commitment = commitments[0]
+    total = 0
+    for commitment in commitments:
+        if commitment[0] != current_commitment[0]:
+            # new commitment
+            totaled_commitments.append(
+                (
+                    commitment[0],
+                    commitment[1],
+                    total,
+                )
+            )
+            current_commitment = commitment[0]
+            total = commitment[3] * commitment[4]
+        else:
+            total += commitment[3] * commitment[4]
+
+    totaled_commitments.append(
+        (
+            commitment[0],
+            commitment[1],
+            total,
+        )
+    )
+    return totaled_commitments
+
+
 def get_approved_commitments_from_munis(token, commitments):
     """Gets approved commitments from Munis"""
     commitment_list = []
@@ -97,7 +128,7 @@ def get_approved_commitments_from_munis(token, commitments):
                 commitment["commitmentNumber"].strip(),
             )
         )
-
+    print(f"Comitment list: {commitment_list}")
     commitment_numbers = ",".join([str(c[1]) for c in commitment_list])
 
     updated_commitments: list = []
@@ -121,13 +152,11 @@ def get_approved_commitments_from_munis(token, commitments):
         GROUP BY ContractNumber
     """
     cursor.execute(query)
-
     results = cursor.fetchall()
-    print(results)
     for row in results:
         for commitment in commitment_list:
             if row[2].strip() == commitment[1]:
-                if row[3] == "8":
+                if row[3].strip() == "8":
                     logger.info("Found an updated commitment")
                     updated_commitments.append(
                         (
@@ -135,7 +164,7 @@ def get_approved_commitments_from_munis(token, commitments):
                             commitment[1],
                             "Approved",
                             row[4],
-                            commitment[4],
+                            0,
                         )
                     )
                 else:
@@ -148,37 +177,45 @@ def get_approved_commitments_from_munis(token, commitments):
                                 commitment[1],
                                 "Void",
                                 row[4],
-                                commitment[4],
+                                0,
                             )
                         )
 
     logger.info("Checking Purchase Orders in Munis")
     query = f"""
-        SELECT
-            PurchaseOrderNumber,
-            [IsApproved],
-            Status,
-            
-        FROM [mun4907prod].[dbo].[PurchaseOrders]
-        WHERE PurchaseOrderNumber IN ({commitment_numbers})
+                SELECT 
+              p.[PurchaseOrderNumber]
+              ,[Status]
+              ,r.TotalAmount
+              ,poi.UnitPrice
+              ,poi.Quantity
+          FROM [mun4907prod].[dbo].[PurchaseOrders] p
+          LEFT JOIN Requisitions r ON r.PurchaseOrderNumber = p.PurchaseOrderNumber
+          LEFT JOIN PurchaseOrderItems poi ON poi.PurchaseOrderId = p.id
+        WHERE p.PurchaseOrderNumber IN ({commitment_numbers})
     """
     cursor.execute(query)
     logger.debug(f"query: {query}")
-    print(cursor.fetchall())
     results = cursor.fetchall()
+    # print(cursor.fetchall())
 
-    for row in results:
+    if results:
+        totaled_commitments = calculate_commitment_total(results)
+    else:
+        totaled_commitments = []
+
+    for row in totaled_commitments:
         for commitment in commitment_list:
-            if row[2].strip() == commitment[1]:
-                if row[3] == "8":
+            if str(row[0]) == commitment[1]:
+                if row[1] == "8":
                     logger.info("Found an updated commitment")
                     updated_commitments.append(
                         (
                             commitment[0],
                             commitment[1],
                             "Approved",
-                            row[4],
-                            commitment[4],
+                            row[2],
+                            0,
                         )
                     )
                 else:
@@ -191,10 +228,9 @@ def get_approved_commitments_from_munis(token, commitments):
                                 commitment[1],
                                 "Void",
                                 row[4],
-                                commitment[4],
+                                0,
                             )
                         )
-                print(row, commitment)
 
     return updated_commitments
 
