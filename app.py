@@ -126,7 +126,7 @@ def main():
         }]
 
         updated_commitments = get_approved_commitments_from_munis(
-            token, fake_commitment
+            token, filtered_invoices
         )
         print(updated_commitments)
         #export_commitments_to_excel(updated_commitments, "CommitmentsUpdate.xlsx")
