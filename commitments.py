@@ -128,7 +128,6 @@ def get_approved_commitments_from_munis(token, commitments):
                 commitment["commitmentNumber"].strip(),
             )
         )
-    print(f"Comitment list: {commitment_list}")
     commitment_numbers = ",".join([str(c[1]) for c in commitment_list])
 
     updated_commitments: list = []
@@ -197,8 +196,6 @@ def get_approved_commitments_from_munis(token, commitments):
     cursor.execute(query)
     logger.debug(f"query: {query}")
     results = cursor.fetchall()
-    # print(cursor.fetchall())
-
     if results:
         totaled_commitments = calculate_commitment_total(results)
     else:

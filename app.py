@@ -96,14 +96,11 @@ def main():
         logger.info("Running commitment invoices API integration")
         ebuilder_token = get_ebuilder_token()
         ebuilder_invoices = get_ebuilder_unpaid_commitment_invoices(ebuilder_token)
-        print(ebuilder_invoices)
         filtered_munis_invoices = get_updated_invoices_from_munis(ebuilder_invoices)
         updated_ebuilder_invoices, invoice_exceptions = update_ebuilder_invoices(
             ebuilder_invoices, filtered_munis_invoices
         )
-        print(updated_ebuilder_invoices)
         # this will go into the ftp folder to be picked up by e-builder
-        # \\citydata\MFT\ebuilder\CommitmentInvoices
         export_invoices_to_excel(
             updated_ebuilder_invoices,
             "//citydata/MFT/ebuilder/CommitmentInvoices/CommitmentInvoicesUpdate.xlsx",
@@ -117,21 +114,10 @@ def main():
         token = get_ebuilder_token()
         unfiltered_invoices = get_ebuilder_commitments(token)
         filtered_invoices = filter_commitments(token, unfiltered_invoices)
-        #x = [print(i) for i in filtered_invoices]
-        fake_commitment = [{
-            "projectID": "fa4552de-1fd6-48a1-8c82-105925ffcd6e",
-            "commitmentNumber": "22300470",
-            "currentCommitmentValue": 29740.0,
-
-        }]
-
         updated_commitments = get_approved_commitments_from_munis(
             token, filtered_invoices
         )
-        print(updated_commitments)
-        #export_commitments_to_excel(updated_commitments, "CommitmentsUpdate.xlsx")
-        # print(filtered_invoices)
-        # print(get_ebuilder_project_from_id(token, '2e6d7b04-e966-4e7d-89f3-d926b4b8594f'))
+        export_commitments_to_excel(updated_commitments, "//citydata/MFT/ebuilder/Commitments/CommitmentsUpdate.xlsx")
 
 
 if __name__ == "__main__":
