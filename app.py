@@ -21,10 +21,10 @@ from commitment_invoices import (
 
 # Logging setup
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.DEBUG)
 
 file_handler = logging.FileHandler("logs/app.log")
 file_handler.setLevel(logging.DEBUG)
