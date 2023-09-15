@@ -27,7 +27,7 @@ stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.INFO)
 
 file_handler = logging.FileHandler("logs/app.log")
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter(
     "%(asctime)s - %(levelname)s - %(funcName)s - %(lineno)d %(message)s"

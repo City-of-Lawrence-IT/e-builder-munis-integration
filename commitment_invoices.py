@@ -47,10 +47,12 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
         Trusted_Connection="yes",
     )
     cursor = conn.cursor()
+    logger.debug(invoice_numbers)
+    logger.debug(cursor)
     placeholders = ", ".join(
         ["?"] * len(invoice_numbers)
     )  # creates a list of '?' for each invoice number
-
+    logger.debug(placeholders)
     cursor.execute(
         f"""
     SELECT
@@ -77,7 +79,10 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
         invoice_numbers,
     )
 
-    return cursor.fetchall()
+    results = cursor.fetchall()
+    logger.debug(results)
+
+    return results
 
 
 def update_ebuilder_invoices(eb_invoices: list, munis_invoices: list) -> (list, list):
