@@ -106,7 +106,7 @@ def calculate_commitment_total(commitments):
             commitment[0],
             commitment[1],
             total,
-        )
+        ),
     )
     return totaled_commitments
 
@@ -131,9 +131,13 @@ def get_approved_commitments_from_munis(token, commitments):
     commitment_numbers = ",".join([str(c[1]) for c in commitment_list])
 
     updated_commitments: list = []
+    logger.info("Connecting to Munis DB")
     conn = pyodbc.connect(
-        "Driver={ODBC Driver 11 for SQL Server};Server=CITYSQLDWH;Database=mun4907prod;",
-        Trusted_Connection="yes",
+        server="CITYSQLDWH",
+        database="mun4907prod",
+        driver="{ODBC Driver 17 for SQL Server}",
+        user=CONFIG["MUNIS_DB_USER"],
+        password=CONFIG["MUNIS_DB_PASSWORD"],
     )
     cursor = conn.cursor()
     logger.info("Checking contracts in Munis")
@@ -196,11 +200,12 @@ def get_approved_commitments_from_munis(token, commitments):
     cursor.execute(query)
     logger.debug(f"query: {query}")
     results = cursor.fetchall()
+    logger.debug(results)
     if results:
         totaled_commitments = calculate_commitment_total(results)
     else:
         totaled_commitments = []
-
+    logger.debug(totaled_commitments)
     for row in totaled_commitments:
         for commitment in commitment_list:
             if str(row[0]) == commitment[1]:
@@ -216,7 +221,7 @@ def get_approved_commitments_from_munis(token, commitments):
                         )
                     )
                 else:
-                    if row[3] == "0":
+                    if row[1] == "0":
                         # untested
                         logger.info("Found a rejected commitment")
                         updated_commitments.append(

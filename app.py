@@ -1,4 +1,3 @@
-import json
 import logging
 from logging.handlers import SMTPHandler
 import requests
@@ -7,7 +6,6 @@ from config import CONFIG
 from helpers import get_ebuilder_token
 from commitments import (
     get_ebuilder_commitments,
-    get_ebuilder_project_from_id,
     get_approved_commitments_from_munis,
     filter_commitments,
     export_commitments_to_excel,
@@ -24,10 +22,10 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.DEBUG)
+stream_handler.setLevel(logging.INFO)
 
 file_handler = logging.FileHandler("logs/app.log")
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter(
     "%(asctime)s - %(levelname)s - %(funcName)s - %(lineno)d %(message)s"
@@ -86,6 +84,7 @@ def get_munis_token():
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
+        logger.error('Error', e)
         print("there was an error ", e)
 
     return response.json().get("access_token")
@@ -111,6 +110,7 @@ def main():
         )
 
     if CONFIG["COMMITMENTS_ENABLED"]:
+        logger.info("Running commitments update API integration")
         token = get_ebuilder_token()
         unfiltered_invoices = get_ebuilder_commitments(token)
         filtered_invoices = filter_commitments(token, unfiltered_invoices)

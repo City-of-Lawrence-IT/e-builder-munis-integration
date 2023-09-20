@@ -44,8 +44,11 @@ def get_updated_invoices_from_munis(invoices: list) -> list:
     invoice_numbers: list = [invoice["invoiceNumber"] for invoice in invoices]
     logger.debug("Connecting to Munis DB")
     conn = pyodbc.connect(
-        "Driver={ODBC Driver 17 for SQL Server};Server=CITYSQLDWH;Database=mun4907prod;",
-        Trusted_Connection="yes",
+        server="CITYSQLDWH",
+        database="mun4907prod",
+        driver="{ODBC Driver 17 for SQL Server}",
+        user=CONFIG["MUNIS_DB_USER"],
+        password=CONFIG["MUNIS_DB_PASSWORD"],
     )
     cursor = conn.cursor()
     logger.debug(invoice_numbers)
