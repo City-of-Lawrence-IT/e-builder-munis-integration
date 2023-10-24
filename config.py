@@ -22,4 +22,6 @@ CONFIG = {
     # set these to only run the api you are working on in development or to disable in production
     'COMMITMENTS_ENABLED': environ.get("COMMITMENTS_ENABLED", 'False').lower() in ('true', '1', 't'),
     'COMMITMENT_INVOICES_ENABLED': environ.get("COMMITMENT_INVOICES_ENABLED", 'False').lower() in ('true', '1', 't'),
+    'COMMITMENT_INVOICES_SAVE_LOCATION': environ.get("COMMITMENT_INVOICES_SAVE_LOCATION"),
+    'COMMITMENT_UPDATES_SAVE_LOCATION': environ.get("COMMITMENT_UPDATES_SAVE_LOCATION"),
 }

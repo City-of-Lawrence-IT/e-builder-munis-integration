@@ -102,11 +102,11 @@ def main():
         # this will go into the ftp folder to be picked up by e-builder
         export_invoices_to_excel(
             updated_ebuilder_invoices,
-            "//citydata/MFT/ebuilder/CommitmentInvoices/CommitmentInvoicesUpdate.xlsx",
+            f"{CONFIG['COMMITMENT_INVOICES_SAVE_LOCATION']}/CommitmentInvoicesUpdate.xlsx",
         )
         #  this will need to be emailed to the finance team
         export_invoices_to_excel(
-            invoice_exceptions, "CommitmentInvoicesExceptions.xlsx"
+            invoice_exceptions, f"{CONFIG['COMMITMENT_INVOICES_SAVE_LOCATION']}/CommitmentInvoicesExceptions.xlsx"
         )
 
     if CONFIG["COMMITMENTS_ENABLED"]:
@@ -117,7 +117,7 @@ def main():
         updated_commitments = get_approved_commitments_from_munis(
             token, filtered_invoices
         )
-        export_commitments_to_excel(updated_commitments, "//citydata/MFT/ebuilder/Commitments/CommitmentsUpdate.xlsx")
+        export_commitments_to_excel(updated_commitments, f"{CONFIG['COMMITMENT_UPDATES_SAVE_LOCATION']}/CommitmentsUpdate.xlsx")
 
 
 if __name__ == "__main__":
