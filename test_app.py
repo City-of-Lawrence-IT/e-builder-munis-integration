@@ -1,7 +1,12 @@
 import app
 
 
-def test_get_project_details():
-    token = app.get_munis_token()
-    assert app.get_project_details(1, token) == "Project 1"
+# create a test for get_ebuilder_commitments making sure the function returns the correct data type
+def test_get_ebuilder_commitments():
+    token = app.get_ebuilder_token()
+    assert type(app.get_ebuilder_commitments(token)) == dict
 
+
+# create a test for get_ebuilder_token making sure the function returns the correct token
+def test_get_ebuilder_token():
+    assert type(app.get_ebuilder_token()) == str

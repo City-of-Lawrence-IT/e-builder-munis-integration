@@ -8,7 +8,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def get_ebuilder_commitments(token) -> list:
+def get_ebuilder_commitments(token) -> dict:
     """Gets commitments from eBuilder"""
     logger.info("Getting commitments from eBuilder")
     try:
