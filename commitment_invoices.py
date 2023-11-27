@@ -16,14 +16,16 @@ def get_ebuilder_unpaid_commitment_invoices(token) -> list:
     response = requests.get(
         f"{CONFIG['EB_API_BASE_URL']}/CommitmentInvoices",
         headers={"Authorization": f"Bearer {token}"},
-        params={"limit": 500, "offset": 0, "dateModified": "2023-05-17T09:41:55.992Z"},
+        params={"limit": 500, "offset": 0, "dateModified": datetime.datetime.now() - datetime.timedelta(days=120)},
     )
     if response.status_code != 200:
         logger.error("Error getting master invoices")
         raise ConnectionError
 
+    records = response.json().get("records")
+
     invoices = []
-    for invoice in response.json().get("records"):
+    for invoice in records:
         if invoice["status"] != "Paid":
             invoices.append(
                 {
