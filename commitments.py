@@ -5,6 +5,8 @@ import pyodbc
 import requests
 import pandas as pd
 
+from helpers import get_ebuilder_token
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +23,7 @@ def get_ebuilder_commitments(token) -> dict:
                 "offset": 0,
                 "dateModified": (
                     datetime.datetime.now(datetime.timezone.utc)
-                    - datetime.timedelta(days=180)
+                    - datetime.timedelta(days=120)
                 )
                 .isoformat()
                 .replace("+00:00", "Z"),
@@ -229,7 +231,7 @@ def get_approved_commitments_from_munis(token, commitments):
                                 commitment[0],
                                 commitment[1],
                                 "Void",
-                                row[4],
+                                0,
                                 0,
                             )
                         )
@@ -251,3 +253,14 @@ def export_commitments_to_excel(commitments: list, filename: str) -> None:
         ],
     )
     df.to_excel(filename, index=False)
+
+
+if __name__ == '__main__':
+    token = get_ebuilder_token()
+    values = get_ebuilder_commitments(token)
+    values = filter_commitments(token, values)
+    values = get_approved_commitments_from_munis(token, values)
+
+    for row in values:
+        if row[1].isdigit() and row[1] == '324000039':
+            print(row)
