@@ -77,7 +77,7 @@ def filter_commitments(token, commitments):
     logger.info("Filtering commitments")
     filtered_commitments = []
     for commitment in commitments["records"]:
-        if commitment["status"] != "Approved":
+        if commitment["status"] != "Approved" and commitment["status"] != "Closed":
             filtered_commitments.append(commitment)
     return filtered_commitments
 
